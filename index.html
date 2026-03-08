@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cờ Vây – Go Game</title>
+  <style>
+    /* ── Reset & base ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --board-color: #dcb465;
+      --board-line: #8a6216;
+      --black-stone: #1a1a1a;
+      --white-stone: #f5f5f5;
+      --accent: #2d6a4f;
+      --accent-light: #52b788;
+      --bg-wait: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #111;
+      color: #eee;
+      overflow: hidden;
+    }
+
+    /* ── Screen helpers ───────────────────────────────────────────── */
+    .screen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    .screen.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(0.97);
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       WAITING SCREEN
+    ══════════════════════════════════════════════════════════════ */
+    #waiting-screen {
+      background: var(--bg-wait);
+      flex-direction: column;
+      gap: 2rem;
+      text-align: center;
+      padding: 2rem;
+    }
+
+    .logo-ring {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      border: 6px solid var(--accent-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: pulse 2s ease-in-out infinite;
+      position: relative;
+    }
+
+    .logo-ring::after {
+      content: '';
+      position: absolute;
+      inset: -14px;
+      border-radius: 50%;
+      border: 3px solid rgba(82, 183, 136, 0.3);
+      animation: ring-spin 4s linear infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(82, 183, 136, 0.6); }
+      50%       { box-shadow: 0 0 0 20px rgba(82, 183, 136, 0); }
+    }
+
+    @keyframes ring-spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .logo-stones {
+      display: grid;
+      grid-template-columns: repeat(3, 22px);
+      grid-template-rows: repeat(3, 22px);
+      gap: 6px;
+    }
+
+    .logo-stone {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--black-stone);
+      box-shadow: 2px 2px 5px rgba(0,0,0,0.6);
+    }
+
+    .logo-stone.w { background: var(--white-stone); box-shadow: 2px 2px 5px rgba(0,0,0,0.3); }
+
+    .wait-title {
+      font-size: 2.4rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      background: linear-gradient(90deg, #52b788, #95d5b2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .wait-subtitle {
+      font-size: 1rem;
+      color: #a0aec0;
+      letter-spacing: 1px;
+    }
+
+    /* Loading dots */
+    .loading-dots {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent-light);
+      animation: bounce-dot 1.4s ease-in-out infinite;
+    }
+
+    .dot:nth-child(1) { animation-delay: 0s; }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes bounce-dot {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+      40%            { transform: scale(1);   opacity: 1;   }
+    }
+
+    .start-btn {
+      margin-top: 0.5rem;
+      padding: 0.85rem 2.8rem;
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent-light));
+      color: #fff;
+      box-shadow: 0 6px 24px rgba(45,106,79,0.5);
+      transition: transform 0.18s, box-shadow 0.18s;
+    }
+
+    .start-btn:hover  { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(45,106,79,0.65); }
+    .start-btn:active { transform: translateY(0);    box-shadow: 0 4px 12px rgba(45,106,79,0.4); }
+
+    /* ══════════════════════════════════════════════════════════════
+       GAME SCREEN
+    ══════════════════════════════════════════════════════════════ */
+    #game-screen {
+      background: #1a1a2e;
+      flex-direction: column;
+      gap: 0;
+      padding: 0;
+      overflow: auto;
+      align-items: center;
+      justify-content: flex-start;
+    }
+
+    /* Header bar */
+    .game-header {
+      width: 100%;
+      background: rgba(15, 52, 96, 0.9);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.65rem 1.2rem;
+      border-bottom: 1px solid rgba(82,183,136,0.25);
+      flex-shrink: 0;
+    }
+
+    .game-header h1 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      background: linear-gradient(90deg, #52b788, #95d5b2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .header-controls {
+      display: flex;
+      gap: 0.6rem;
+    }
+
+    .btn-sm {
+      padding: 0.35rem 0.9rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: transform 0.15s, opacity 0.15s;
+    }
+
+    .btn-sm:hover  { opacity: 0.85; transform: translateY(-1px); }
+    .btn-sm:active { transform: translateY(0); }
+
+    .btn-reset  { background: #e63946; color: #fff; }
+    .btn-back   { background: rgba(255,255,255,0.12); color: #ccc; }
+    .btn-undo   { background: rgba(255,255,255,0.12); color: #ccc; }
+
+    /* Score bar */
+    .score-bar {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 2rem;
+      padding: 0.5rem 1rem;
+      background: rgba(10,10,20,0.6);
+      flex-shrink: 0;
+    }
+
+    .player-card {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      padding: 0.3rem 0.9rem;
+      border-radius: 40px;
+      background: rgba(255,255,255,0.06);
+      border: 1.5px solid transparent;
+      transition: border-color 0.3s;
+      min-width: 130px;
+    }
+
+    .player-card.active { border-color: var(--accent-light); }
+
+    .stone-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 2px 2px 6px rgba(0,0,0,0.5);
+    }
+
+    .stone-icon.black { background: radial-gradient(circle at 35% 35%, #555, #111); }
+    .stone-icon.white { background: radial-gradient(circle at 35% 35%, #fff, #ccc); }
+
+    .player-info { display: flex; flex-direction: column; }
+    .player-name { font-size: 0.82rem; font-weight: 600; color: #ddd; }
+    .player-captures { font-size: 0.72rem; color: #8a9bb5; }
+
+    .turn-label {
+      font-size: 0.82rem;
+      color: #8a9bb5;
+      text-align: center;
+    }
+
+    /* Board wrapper */
+    .board-wrapper {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.8rem;
+      width: 100%;
+      overflow: auto;
+    }
+
+    /* Board */
+    .board-container {
+      position: relative;
+      border-radius: 6px;
+      box-shadow: 0 0 0 8px #a0722a, 0 0 0 12px #7a5520, 0 12px 40px rgba(0,0,0,0.7);
+      background: var(--board-color);
+    }
+
+    canvas#board {
+      display: block;
+      cursor: crosshair;
+    }
+
+    /* Status bar */
+    .status-bar {
+      width: 100%;
+      text-align: center;
+      padding: 0.4rem 1rem;
+      font-size: 0.8rem;
+      color: #6b7d99;
+      background: rgba(10,10,20,0.6);
+      flex-shrink: 0;
+    }
+
+    /* ── Responsive tweaks ─────────────────────────────────────────── */
+    @media (max-width: 520px) {
+      .wait-title  { font-size: 1.8rem; }
+      .player-card { min-width: 110px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ══════════════════════════════════
+       SCREEN 1 – WAITING / SPLASH
+  ══════════════════════════════════ -->
+  <div id="waiting-screen" class="screen">
+    <div class="logo-ring">
+      <div class="logo-stones">
+        <div class="logo-stone w"></div><div class="logo-stone"></div><div class="logo-stone w"></div>
+        <div class="logo-stone"></div><div class="logo-stone w"></div><div class="logo-stone"></div>
+        <div class="logo-stone w"></div><div class="logo-stone"></div><div class="logo-stone w"></div>
+      </div>
+    </div>
+
+    <div>
+      <h1 class="wait-title">CỜ VÂY</h1>
+      <p class="wait-subtitle">Go · 19 × 19 Board</p>
+    </div>
+
+    <div class="loading-dots">
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+    </div>
+
+    <button class="start-btn" id="start-btn">▶ &nbsp;Bắt Đầu</button>
+  </div>
+
+  <!-- ══════════════════════════════════
+       SCREEN 2 – GAME (19 × 19 board)
+  ══════════════════════════════════ -->
+  <div id="game-screen" class="screen hidden">
+    <header class="game-header">
+      <h1>⬡ Cờ Vây – 19×19</h1>
+      <div class="header-controls">
+        <button class="btn-sm btn-undo"  id="undo-btn">↩ Undo</button>
+        <button class="btn-sm btn-reset" id="reset-btn">↺ Reset</button>
+        <button class="btn-sm btn-back"  id="back-btn">← Menu</button>
+      </div>
+    </header>
+
+    <div class="score-bar">
+      <div class="player-card active" id="card-black">
+        <div class="stone-icon black"></div>
+        <div class="player-info">
+          <span class="player-name">Đen</span>
+          <span class="player-captures" id="captures-black">Bắt: 0</span>
+        </div>
+      </div>
+
+      <div class="turn-label" id="turn-label">Lượt: Đen</div>
+
+      <div class="player-card" id="card-white">
+        <div class="stone-icon white"></div>
+        <div class="player-info">
+          <span class="player-name">Trắng</span>
+          <span class="player-captures" id="captures-white">Bắt: 0</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="board-wrapper">
+      <div class="board-container">
+        <canvas id="board"></canvas>
+      </div>
+    </div>
+
+    <div class="status-bar" id="status-bar">Click vào giao điểm để đặt quân</div>
+  </div>
+
+  <script>
+    /* ── Constants ─────────────────────────────────────────────── */
+    const SIZE            = 19;
+    const PADDING         = 28;   // px from canvas edge to first line
+    const VIEWPORT_MARGIN = 80;   // px reserved for header, score-bar, and padding
+    const EMPTY   = 0;
+    const BLACK   = 1;
+    const WHITE   = 2;
+
+    /* ── State ─────────────────────────────────────────────────── */
+    let grid, turn, capturesB, capturesW, history;
+    let cellSize;
+
+    /* ── Canvas setup ──────────────────────────────────────────── */
+    const canvas = document.getElementById('board');
+    const ctx    = canvas.getContext('2d');
+
+    function calcCellSize() {
+      const maxW = Math.min(window.innerWidth,  window.innerHeight) - VIEWPORT_MARGIN;
+      const raw  = Math.floor((maxW - PADDING * 2) / (SIZE - 1));
+      return Math.max(22, Math.min(38, raw));
+    }
+
+    function resizeCanvas() {
+      cellSize = calcCellSize();
+      const dim = PADDING * 2 + cellSize * (SIZE - 1);
+      canvas.width  = dim;
+      canvas.height = dim;
+      if (grid) drawBoard();
+    }
+
+    /* ── Board drawing ─────────────────────────────────────────── */
+    function drawBoard() {
+      const dim = canvas.width;
+      ctx.clearRect(0, 0, dim, dim);
+
+      // Background wood colour
+      ctx.fillStyle = '#dcb465';
+      ctx.fillRect(0, 0, dim, dim);
+
+      // Grid lines
+      ctx.strokeStyle = '#8a6216';
+      ctx.lineWidth   = 0.9;
+      for (let i = 0; i < SIZE; i++) {
+        const x = PADDING + i * cellSize;
+        const y = PADDING + i * cellSize;
+        ctx.beginPath(); ctx.moveTo(x, PADDING); ctx.lineTo(x, PADDING + (SIZE-1)*cellSize); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(PADDING, y); ctx.lineTo(PADDING + (SIZE-1)*cellSize, y); ctx.stroke();
+      }
+
+      // Border (thicker)
+      ctx.strokeStyle = '#5c3d0a';
+      ctx.lineWidth   = 2;
+      ctx.strokeRect(PADDING, PADDING, (SIZE-1)*cellSize, (SIZE-1)*cellSize);
+
+      // Star points (hoshi)
+      const stars = (SIZE === 19)
+        ? [3,9,15].flatMap(r => [3,9,15].map(c => [r,c]))
+        : [];
+      ctx.fillStyle = '#5c3d0a';
+      stars.forEach(([r, c]) => {
+        ctx.beginPath();
+        ctx.arc(PADDING + c*cellSize, PADDING + r*cellSize, cellSize*0.14, 0, Math.PI*2);
+        ctx.fill();
+      });
+
+      // Coordinate labels
+      const labels = 'ABCDEFGHJKLMNOPQRST'.split('');
+      ctx.fillStyle  = '#5c3d0a';
+      ctx.font       = `${Math.max(9, cellSize * 0.42)}px monospace`;
+      ctx.textAlign  = 'center';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i < SIZE; i++) {
+        const x = PADDING + i * cellSize;
+        const y = PADDING + i * cellSize;
+        ctx.fillText(labels[i], x, PADDING * 0.5);
+        ctx.fillText(labels[i], x, dim - PADDING * 0.5);
+        ctx.fillText(String(SIZE - i), PADDING * 0.5, y);
+        ctx.fillText(String(SIZE - i), dim - PADDING * 0.5, y);
+      }
+
+      // Stones
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          if (grid[r][c] !== EMPTY) drawStone(r, c, grid[r][c]);
+        }
+      }
+    }
+
+    function drawStone(r, c, color) {
+      const x      = PADDING + c * cellSize;
+      const y      = PADDING + r * cellSize;
+      const radius = cellSize * 0.46;
+      const grad = ctx.createRadialGradient(x - radius*0.3, y - radius*0.3, radius*0.1, x, y, radius);
+      if (color === BLACK) {
+        grad.addColorStop(0, '#555');
+        grad.addColorStop(1, '#111');
+      } else {
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(1, '#cccccc');
+      }
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.strokeStyle = color === BLACK ? '#000' : '#999';
+      ctx.lineWidth   = 0.7;
+      ctx.stroke();
+    }
+
+    /* ── Game logic ────────────────────────────────────────────── */
+    function initGame() {
+      grid      = Array.from({ length: SIZE }, () => new Array(SIZE).fill(EMPTY));
+      turn      = BLACK;
+      capturesB = 0;
+      capturesW = 0;
+      history   = [];
+      hoverRow  = -1;
+      hoverCol  = -1;
+      updateUI();
+      drawBoard();
+    }
+
+    function cloneGrid(g) {
+      return g.map(r => [...r]);
+    }
+
+    function getGroup(g, r, c, color) {
+      const visited = new Set();
+      const stack   = [[r, c]];
+      const group   = [];
+      while (stack.length) {
+        const [cr, cc] = stack.pop();
+        const key = cr * SIZE + cc;
+        if (visited.has(key)) continue;
+        visited.add(key);
+        if (g[cr][cc] !== color) continue;
+        group.push([cr, cc]);
+        for (const [nr, nc] of neighbors(cr, cc)) {
+          if (!visited.has(nr * SIZE + nc)) stack.push([nr, nc]);
+        }
+      }
+      return group;
+    }
+
+    function hasLiberty(g, group) {
+      return group.some(([r, c]) =>
+        neighbors(r, c).some(([nr, nc]) => g[nr][nc] === EMPTY)
+      );
+    }
+
+    function neighbors(r, c) {
+      return [[r-1,c],[r+1,c],[r,c-1],[r,c+1]].filter(
+        ([nr, nc]) => nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE
+      );
+    }
+
+    function placeStone(r, c) {
+      if (grid[r][c] !== EMPTY) {
+        setStatus('Ô này đã có quân!');
+        return false;
+      }
+
+      const newGrid = cloneGrid(grid);
+      const opponent = turn === BLACK ? WHITE : BLACK;
+      newGrid[r][c] = turn;
+
+      // Capture opponent's dead groups
+      let captured = 0;
+      for (const [nr, nc] of neighbors(r, c)) {
+        if (newGrid[nr][nc] === opponent) {
+          const grp = getGroup(newGrid, nr, nc, opponent);
+          if (!hasLiberty(newGrid, grp)) {
+            grp.forEach(([gr, gc]) => { newGrid[gr][gc] = EMPTY; });
+            captured += grp.length;
+          }
+        }
+      }
+
+      // Suicide check (own group must have liberty after captures)
+      const ownGroup = getGroup(newGrid, r, c, turn);
+      if (!hasLiberty(newGrid, ownGroup)) {
+        setStatus('Nước đi tự sát không hợp lệ!');
+        return false;
+      }
+
+      // Ko check (simple: compare with grid two moves ago)
+      const stateStr = newGrid.map(row => row.join('')).join('');
+      if (history.length >= 2 && history[history.length - 2].state === stateStr) {
+        setStatus('Vi phạm quy tắc Ko!');
+        return false;
+      }
+
+      // Commit move
+      history.push({ grid: cloneGrid(grid), capturesB, capturesW, state: stateStr });
+      grid = newGrid;
+      if (turn === BLACK) capturesB += captured;
+      else                capturesW += captured;
+
+      turn = turn === BLACK ? WHITE : BLACK;
+      updateUI();
+      drawBoard();
+      setStatus('Click vào giao điểm để đặt quân');
+      return true;
+    }
+
+    function undoMove() {
+      if (history.length === 0) { setStatus('Không có nước để hoàn tác!'); return; }
+      const last = history.pop();
+      grid      = last.grid;
+      capturesB = last.capturesB;
+      capturesW = last.capturesW;
+      turn      = turn === BLACK ? WHITE : BLACK;
+      updateUI();
+      drawBoard();
+      setStatus('Đã hoàn tác nước đi.');
+    }
+
+    function updateUI() {
+      const isBlack = (turn === BLACK);
+      document.getElementById('card-black').classList.toggle('active',  isBlack);
+      document.getElementById('card-white').classList.toggle('active', !isBlack);
+      document.getElementById('turn-label').textContent =
+        'Lượt: ' + (isBlack ? 'Đen' : 'Trắng');
+      document.getElementById('captures-black').textContent = `Bắt: ${capturesB}`;
+      document.getElementById('captures-white').textContent = `Bắt: ${capturesW}`;
+    }
+
+    function setStatus(msg) {
+      document.getElementById('status-bar').textContent = msg;
+    }
+
+    /* ── Canvas click ──────────────────────────────────────────── */
+    canvas.addEventListener('click', e => {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width  / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const px = (e.clientX - rect.left)  * scaleX;
+      const py = (e.clientY - rect.top)   * scaleY;
+      const c  = Math.round((px - PADDING) / cellSize);
+      const r  = Math.round((py - PADDING) / cellSize);
+      if (r >= 0 && r < SIZE && c >= 0 && c < SIZE) {
+        const snapX = PADDING + c * cellSize;
+        const snapY = PADDING + r * cellSize;
+        if (Math.abs(px - snapX) < cellSize * 0.45 && Math.abs(py - snapY) < cellSize * 0.45) {
+          placeStone(r, c);
+        }
+      }
+    });
+
+    /* ── Hover highlight (only redraws when cell changes) ─────────── */
+    let hoverRow = -1, hoverCol = -1;
+    canvas.addEventListener('mousemove', e => {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width  / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const px = (e.clientX - rect.left)  * scaleX;
+      const py = (e.clientY - rect.top)   * scaleY;
+      const c  = Math.round((px - PADDING) / cellSize);
+      const r  = Math.round((py - PADDING) / cellSize);
+      if (r === hoverRow && c === hoverCol) return; // no change – skip redraw
+      hoverRow = r;
+      hoverCol = c;
+      drawBoard();
+      if (r >= 0 && r < SIZE && c >= 0 && c < SIZE && grid[r][c] === EMPTY) {
+        const x = PADDING + c * cellSize;
+        const y = PADDING + r * cellSize;
+        ctx.beginPath();
+        ctx.arc(x, y, cellSize * 0.46, 0, Math.PI * 2);
+        ctx.fillStyle = turn === BLACK
+          ? 'rgba(0,0,0,0.35)'
+          : 'rgba(255,255,255,0.35)';
+        ctx.fill();
+      }
+    });
+
+    /* ── Screen transitions ────────────────────────────────────── */
+    function showGame() {
+      document.getElementById('waiting-screen').classList.add('hidden');
+      document.getElementById('game-screen').classList.remove('hidden');
+      initGame();
+      resizeCanvas();
+    }
+
+    function showWaiting() {
+      document.getElementById('game-screen').classList.add('hidden');
+      document.getElementById('waiting-screen').classList.remove('hidden');
+    }
+
+    /* ── Button wiring ─────────────────────────────────────────── */
+    document.getElementById('start-btn').addEventListener('click', showGame);
+    document.getElementById('back-btn').addEventListener('click', showWaiting);
+    document.getElementById('reset-btn').addEventListener('click', () => {
+      initGame();
+      setStatus('Đã reset bàn cờ!');
+    });
+    document.getElementById('undo-btn').addEventListener('click', undoMove);
+
+    /* ── Responsive resize ─────────────────────────────────────── */
+    window.addEventListener('resize', () => {
+      if (!document.getElementById('game-screen').classList.contains('hidden')) {
+        resizeCanvas();
+      }
+    });
+  </script>
+</body>
+</html>
