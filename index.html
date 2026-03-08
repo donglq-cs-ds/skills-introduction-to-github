@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cờ Vây - Go Game</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #2c1a0e;
+      color: #f5e6c8;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 8px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      letter-spacing: 2px;
+    }
+
+    h1 span { color: #f0c040; }
+
+    .subtitle {
+      font-size: 0.9rem;
+      color: #c8a87a;
+      margin-bottom: 20px;
+    }
+
+    .game-container {
+      display: flex;
+      gap: 30px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .board-wrapper {
+      position: relative;
+    }
+
+    #board-canvas {
+      display: block;
+      cursor: pointer;
+      border-radius: 4px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-width: 200px;
+    }
+
+    .panel {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+
+    .panel h3 {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #f0c040;
+      margin-bottom: 10px;
+    }
+
+    .player-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 7px;
+      margin-bottom: 6px;
+      transition: background 0.2s;
+    }
+
+    .player-info.active {
+      background: rgba(240, 192, 64, 0.18);
+      border: 1px solid rgba(240, 192, 64, 0.4);
+    }
+
+    .stone-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .stone-icon.black {
+      background: radial-gradient(circle at 35% 35%, #555, #000);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+    }
+
+    .stone-icon.white {
+      background: radial-gradient(circle at 35% 35%, #fff, #bbb);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
+
+    .player-details { flex: 1; }
+    .player-name { font-weight: 600; font-size: 0.95rem; }
+    .player-score { font-size: 0.8rem; color: #c8a87a; }
+
+    .turn-indicator {
+      text-align: center;
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 10px;
+      border-radius: 7px;
+      background: rgba(240, 192, 64, 0.1);
+      border: 1px solid rgba(240, 192, 64, 0.3);
+    }
+
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 7px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-primary {
+      background: #f0c040;
+      color: #2c1a0e;
+    }
+
+    .btn-primary:hover { background: #ffd060; transform: translateY(-1px); }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.1);
+      color: #f5e6c8;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .btn-secondary:hover { background: rgba(255,255,255,0.18); transform: translateY(-1px); }
+
+    .btn-danger {
+      background: rgba(200, 60, 60, 0.3);
+      color: #ff8888;
+      border: 1px solid rgba(200, 60, 60, 0.4);
+    }
+
+    .btn-danger:hover { background: rgba(200, 60, 60, 0.5); transform: translateY(-1px); }
+
+    .log-area {
+      font-size: 0.78rem;
+      color: #c8a87a;
+      max-height: 150px;
+      overflow-y: auto;
+      line-height: 1.6;
+    }
+
+    .log-area::-webkit-scrollbar { width: 4px; }
+    .log-area::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+
+    .size-selector {
+      display: flex;
+      gap: 6px;
+    }
+
+    .size-btn {
+      flex: 1;
+      padding: 6px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.08);
+      color: #f5e6c8;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: all 0.2s;
+    }
+
+    .size-btn.active, .size-btn:hover {
+      background: rgba(240, 192, 64, 0.25);
+      border-color: #f0c040;
+      color: #f0c040;
+    }
+
+    #result-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #result-modal.show { display: flex; }
+
+    .modal-box {
+      background: #3d2b14;
+      border: 2px solid #f0c040;
+      border-radius: 14px;
+      padding: 36px 40px;
+      text-align: center;
+      max-width: 360px;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+    }
+
+    .modal-box h2 {
+      font-size: 1.8rem;
+      color: #f0c040;
+      margin-bottom: 12px;
+    }
+
+    .modal-box p {
+      color: #c8a87a;
+      margin-bottom: 8px;
+      font-size: 0.95rem;
+    }
+
+    .modal-box .score-table {
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 16px 0;
+      font-size: 0.9rem;
+    }
+
+    .score-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>♟ <span>Cờ Vây</span> Go Game</h1>
+  <p class="subtitle">Trò chơi cờ vây cổ điển · Classic Board Game</p>
+
+  <div class="game-container">
+    <div class="board-wrapper">
+      <canvas id="board-canvas"></canvas>
+    </div>
+
+    <div class="sidebar">
+      <div class="panel">
+        <h3>Cài đặt · Settings</h3>
+        <div class="size-selector">
+          <button class="size-btn" data-size="9">9×9</button>
+          <button class="size-btn active" data-size="13">13×13</button>
+          <button class="size-btn" data-size="19">19×19</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Lượt chơi · Turn</h3>
+        <div class="player-info" id="black-info">
+          <div class="stone-icon black"></div>
+          <div class="player-details">
+            <div class="player-name">Đen · Black</div>
+            <div class="player-score" id="black-score">Quân ăn: 0</div>
+          </div>
+        </div>
+        <div class="player-info" id="white-info">
+          <div class="stone-icon white"></div>
+          <div class="player-details">
+            <div class="player-name">Trắng · White</div>
+            <div class="player-score" id="white-score">Quân ăn: 0 | Komi: 6.5</div>
+          </div>
+        </div>
+        <div class="turn-indicator" id="turn-text">Lượt Đen đi</div>
+      </div>
+
+      <div class="panel">
+        <h3>Hành động · Actions</h3>
+        <button class="btn btn-secondary" id="btn-pass" style="margin-bottom:8px">Bỏ lượt · Pass</button>
+        <button class="btn btn-danger" id="btn-resign" style="margin-bottom:8px">Đầu hàng · Resign</button>
+        <button class="btn btn-primary" id="btn-new-game">Ván mới · New Game</button>
+      </div>
+
+      <div class="panel">
+        <h3>Nhật ký · Log</h3>
+        <div class="log-area" id="game-log"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="result-modal">
+    <div class="modal-box">
+      <h2 id="modal-title">Kết thúc!</h2>
+      <p id="modal-winner"></p>
+      <div class="score-table" id="modal-scores"></div>
+      <div class="modal-buttons">
+        <button class="btn btn-primary" id="btn-modal-new" style="flex:1">Ván mới</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ─── Constants ────────────────────────────────────────────────────────────
+    const EMPTY = 0, BLACK = 1, WHITE = 2;
+    const KOMI = 6.5;
+    const SIDEBAR_WIDTH = 260;  // px reserved for sidebar when computing board size
+    const MAX_BOARD_PX = 640;   // maximum board canvas width in pixels
+
+    // ─── Game State ───────────────────────────────────────────────────────────
+    let boardSize = 13;
+    let board = [];
+    let currentPlayer = BLACK;
+    let captures = { [BLACK]: 0, [WHITE]: 0 };
+    let koPoint = null;         // forbidden point (Ko rule)
+    let prevBoardHash = null;   // for Ko detection
+    let passCount = 0;          // two consecutive passes → game ends
+    let gameOver = false;
+    let moveNumber = 0;
+
+    // ─── Canvas Setup ─────────────────────────────────────────────────────────
+    const canvas = document.getElementById('board-canvas');
+    const ctx = canvas.getContext('2d');
+    let CELL, MARGIN, CANVAS_SIZE;
+
+    function calcLayout() {
+      const maxBoardPx = Math.min(window.innerWidth - SIDEBAR_WIDTH, MAX_BOARD_PX);
+      CELL = Math.floor(maxBoardPx / (boardSize + 1));
+      CELL = Math.max(CELL, 24);
+      MARGIN = CELL;
+      CANVAS_SIZE = CELL * (boardSize + 1);
+      canvas.width = CANVAS_SIZE;
+      canvas.height = CANVAS_SIZE;
+    }
+
+    // ─── Board Helpers ────────────────────────────────────────────────────────
+    function initBoard() {
+      board = Array.from({ length: boardSize }, () => new Array(boardSize).fill(EMPTY));
+      currentPlayer = BLACK;
+      captures = { [BLACK]: 0, [WHITE]: 0 };
+      koPoint = null;
+      prevBoardHash = null;
+      passCount = 0;
+      gameOver = false;
+      moveNumber = 0;
+    }
+
+    function inBounds(r, c) {
+      return r >= 0 && r < boardSize && c >= 0 && c < boardSize;
+    }
+
+    function neighbors(r, c) {
+      return [[r-1,c],[r+1,c],[r,c-1],[r,c+1]].filter(([nr,nc]) => inBounds(nr,nc));
+    }
+
+    function boardHash(b) {
+      return b.map(row => row.join('')).join('|');
+    }
+
+    /** BFS: get the group (connected stones of same color) and its liberties */
+    function getGroup(b, r, c) {
+      const color = b[r][c];
+      const stones = [];
+      const liberties = new Set();
+      const visited = new Set();
+      const queue = [[r, c]];
+      visited.add(r * boardSize + c);
+      while (queue.length) {
+        const [cr, cc] = queue.shift();
+        stones.push([cr, cc]);
+        for (const [nr, nc] of neighbors(cr, cc)) {
+          const key = nr * boardSize + nc;
+          if (b[nr][nc] === EMPTY) {
+            liberties.add(key);
+          } else if (b[nr][nc] === color && !visited.has(key)) {
+            visited.add(key);
+            queue.push([nr, nc]);
+          }
+        }
+      }
+      return { stones, liberties };
+    }
+
+    /** Try to place a stone; returns false if illegal */
+    function placeStone(r, c) {
+      if (gameOver) return false;
+      if (!inBounds(r, c)) return false;
+      if (board[r][c] !== EMPTY) return false;
+      if (koPoint && koPoint[0] === r && koPoint[1] === c) return false;
+
+      // Make a copy to test legality
+      const testBoard = board.map(row => [...row]);
+      testBoard[r][c] = currentPlayer;
+      const opponent = currentPlayer === BLACK ? WHITE : BLACK;
+
+      // Capture opponent groups with no liberties
+      let captured = 0;
+      const capturedSingles = [];
+      for (const [nr, nc] of neighbors(r, c)) {
+        if (testBoard[nr][nc] === opponent) {
+          const { stones, liberties } = getGroup(testBoard, nr, nc);
+          if (liberties.size === 0) {
+            for (const [sr, sc] of stones) {
+              testBoard[sr][sc] = EMPTY;
+              capturedSingles.push([sr, sc]);
+            }
+            captured += stones.length;
+          }
+        }
+      }
+
+      // Check suicide (placed stone's group has no liberties after captures)
+      const { liberties: selfLib } = getGroup(testBoard, r, c);
+      if (selfLib.size === 0) return false; // suicide not allowed
+
+      // Ko rule: resulting board must differ from 2 moves ago
+      const newHash = boardHash(testBoard);
+      if (newHash === prevBoardHash) return false;
+
+      // Commit move
+      prevBoardHash = boardHash(board);
+      board = testBoard;
+      captures[currentPlayer] += captured;
+
+      // Ko detection: single stone captured → potential ko point
+      if (captured === 1 && capturedSingles.length === 1) {
+        koPoint = capturedSingles[0];
+      } else {
+        koPoint = null;
+      }
+
+      passCount = 0;
+      moveNumber++;
+      logMove(r, c, currentPlayer, captured);
+      currentPlayer = opponent;
+      updateUI();
+      drawBoard();
+      return true;
+    }
+
+    function pass() {
+      if (gameOver) return;
+      const opponent = currentPlayer === BLACK ? WHITE : BLACK;
+      passCount++;
+      logMessage(`${playerName(currentPlayer)} bỏ lượt (Pass)`);
+      prevBoardHash = boardHash(board);
+      koPoint = null;
+      currentPlayer = opponent;
+      updateUI();
+      if (passCount >= 2) {
+        endGame('pass');
+      } else {
+        drawBoard();
+      }
+    }
+
+    function resign() {
+      if (gameOver) return;
+      const winner = currentPlayer === BLACK ? WHITE : BLACK;
+      logMessage(`${playerName(currentPlayer)} đầu hàng! ${playerName(winner)} thắng!`);
+      gameOver = true;
+      showResult('resign', winner);
+    }
+
+    // ─── Scoring (territory counting - area scoring) ──────────────────────────
+    function computeScore() {
+      // Mark territories using flood-fill on empty intersections
+      const territory = Array.from({ length: boardSize }, () => new Array(boardSize).fill(0));
+      const visited = Array.from({ length: boardSize }, () => new Array(boardSize).fill(false));
+
+      for (let r = 0; r < boardSize; r++) {
+        for (let c = 0; c < boardSize; c++) {
+          if (board[r][c] === EMPTY && !visited[r][c]) {
+            // BFS this empty region
+            const region = [];
+            const borders = new Set();
+            const queue = [[r, c]];
+            visited[r][c] = true;
+            while (queue.length) {
+              const [cr, cc] = queue.shift();
+              region.push([cr, cc]);
+              for (const [nr, nc] of neighbors(cr, cc)) {
+                if (board[nr][nc] === EMPTY && !visited[nr][nc]) {
+                  visited[nr][nc] = true;
+                  queue.push([nr, nc]);
+                } else if (board[nr][nc] !== EMPTY) {
+                  borders.add(board[nr][nc]);
+                }
+              }
+            }
+            // Assign territory only if region is surrounded by exactly one color
+            if (borders.size === 1) {
+              const owner = [...borders][0];
+              for (const [tr, tc] of region) {
+                territory[tr][tc] = owner;
+              }
+            }
+          }
+        }
+      }
+
+      let blackStones = 0, whiteStones = 0;
+      let blackTerritory = 0, whiteTerritory = 0;
+
+      for (let r = 0; r < boardSize; r++) {
+        for (let c = 0; c < boardSize; c++) {
+          if (board[r][c] === BLACK) blackStones++;
+          else if (board[r][c] === WHITE) whiteStones++;
+          if (territory[r][c] === BLACK) blackTerritory++;
+          else if (territory[r][c] === WHITE) whiteTerritory++;
+        }
+      }
+
+      const blackTotal = blackStones + blackTerritory + captures[BLACK];
+      const whiteTotal = whiteStones + whiteTerritory + captures[WHITE] + KOMI;
+
+      return {
+        blackStones, whiteStones,
+        blackTerritory, whiteTerritory,
+        blackCaptures: captures[BLACK], whiteCaptures: captures[WHITE],
+        blackTotal, whiteTotal
+      };
+    }
+
+    function endGame(reason) {
+      gameOver = true;
+      const score = computeScore();
+      const winner = score.blackTotal > score.whiteTotal ? BLACK : WHITE;
+      showResult(reason, winner, score);
+    }
+
+    // ─── UI Helpers ───────────────────────────────────────────────────────────
+    function playerName(p) { return p === BLACK ? 'Đen (Black)' : 'Trắng (White)'; }
+    function playerShort(p) { return p === BLACK ? '●' : '○'; }
+    /** Convert 0-based column index to letter, skipping 'I' per Go convention */
+    function columnToLetter(c) { return String.fromCharCode(65 + (c >= 8 ? c + 1 : c)); }
+
+    function logMove(r, c, p, cap) {
+      const col = columnToLetter(c);
+      const row = boardSize - r;
+      let msg = `#${moveNumber} ${playerShort(p)} ${col}${row}`;
+      if (cap > 0) msg += ` (ăn ${cap})`;
+      logMessage(msg);
+    }
+
+    function logMessage(msg) {
+      const el = document.getElementById('game-log');
+      el.innerHTML += `<div>${msg}</div>`;
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function updateUI() {
+      const blackActive = currentPlayer === BLACK && !gameOver;
+      const whiteActive = currentPlayer === WHITE && !gameOver;
+      document.getElementById('black-info').className = 'player-info' + (blackActive ? ' active' : '');
+      document.getElementById('white-info').className = 'player-info' + (whiteActive ? ' active' : '');
+      document.getElementById('black-score').textContent = `Quân ăn: ${captures[BLACK]}`;
+      document.getElementById('white-score').textContent = `Quân ăn: ${captures[WHITE]} | Komi: ${KOMI}`;
+      if (!gameOver) {
+        document.getElementById('turn-text').textContent = `Lượt ${playerName(currentPlayer)} đi`;
+      } else {
+        document.getElementById('turn-text').textContent = 'Ván đấu kết thúc';
+      }
+    }
+
+    function showResult(reason, winner, score) {
+      const modal = document.getElementById('result-modal');
+      const title = document.getElementById('modal-title');
+      const winnerEl = document.getElementById('modal-winner');
+      const scoresEl = document.getElementById('modal-scores');
+
+      title.textContent = winner === BLACK ? '● Đen thắng!' : '○ Trắng thắng!';
+      if (reason === 'resign') {
+        winnerEl.textContent = `${playerName(winner === BLACK ? WHITE : BLACK)} đầu hàng. ${playerName(winner)} thắng!`;
+        scoresEl.innerHTML = '';
+      } else if (score) {
+        winnerEl.textContent = `${playerName(winner)} thắng với ${Math.abs(score.blackTotal - score.whiteTotal).toFixed(1)} điểm!`;
+        scoresEl.innerHTML = `
+          <div class="score-row"><span>Đá Đen trên bàn</span><span>${score.blackStones}</span></div>
+          <div class="score-row"><span>Lãnh thổ Đen</span><span>${score.blackTerritory}</span></div>
+          <div class="score-row"><span>Đen ăn quân</span><span>${score.blackCaptures}</span></div>
+          <div class="score-row" style="font-weight:700;border-top:1px solid rgba(255,255,255,0.15);padding-top:6px;margin-top:4px"><span>Tổng Đen</span><span>${score.blackTotal.toFixed(1)}</span></div>
+          <div class="score-row" style="margin-top:10px"><span>Đá Trắng trên bàn</span><span>${score.whiteStones}</span></div>
+          <div class="score-row"><span>Lãnh thổ Trắng</span><span>${score.whiteTerritory}</span></div>
+          <div class="score-row"><span>Trắng ăn quân</span><span>${score.whiteCaptures}</span></div>
+          <div class="score-row"><span>Komi</span><span>${KOMI}</span></div>
+          <div class="score-row" style="font-weight:700;border-top:1px solid rgba(255,255,255,0.15);padding-top:6px;margin-top:4px"><span>Tổng Trắng</span><span>${score.whiteTotal.toFixed(1)}</span></div>
+        `;
+      }
+      modal.classList.add('show');
+      drawBoard();
+    }
+
+    // ─── Drawing ──────────────────────────────────────────────────────────────
+    // Star points (hoshi) positions
+    function getStarPoints(size) {
+      if (size === 19) {
+        return [[3,3],[3,9],[3,15],[9,3],[9,9],[9,15],[15,3],[15,9],[15,15]];
+      } else if (size === 13) {
+        return [[3,3],[3,9],[6,6],[9,3],[9,9]];
+      } else { // 9x9
+        return [[2,2],[2,6],[4,4],[6,2],[6,6]];
+      }
+    }
+
+    function drawBoard() {
+      ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+      // Board background (wood texture)
+      const grad = ctx.createLinearGradient(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+      grad.addColorStop(0, '#d4a054');
+      grad.addColorStop(0.5, '#c8913a');
+      grad.addColorStop(1, '#b87828');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+      // Wood grain lines (decorative)
+      ctx.strokeStyle = 'rgba(180, 120, 30, 0.25)';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < CANVAS_SIZE; i += 8) {
+        ctx.beginPath();
+        ctx.moveTo(0, i);
+        ctx.lineTo(CANVAS_SIZE, i + 20);
+        ctx.stroke();
+      }
+
+      // Grid lines
+      ctx.strokeStyle = '#5a3a10';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < boardSize; i++) {
+        const x = MARGIN + i * CELL;
+        const y = MARGIN + i * CELL;
+        ctx.beginPath();
+        ctx.moveTo(x, MARGIN);
+        ctx.lineTo(x, MARGIN + (boardSize - 1) * CELL);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(MARGIN, y);
+        ctx.lineTo(MARGIN + (boardSize - 1) * CELL, y);
+        ctx.stroke();
+      }
+
+      // Border (thicker)
+      ctx.strokeStyle = '#3a2008';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(MARGIN, MARGIN, (boardSize - 1) * CELL, (boardSize - 1) * CELL);
+
+      // Star points
+      ctx.fillStyle = '#3a2008';
+      for (const [sr, sc] of getStarPoints(boardSize)) {
+        ctx.beginPath();
+        ctx.arc(MARGIN + sc * CELL, MARGIN + sr * CELL, CELL * 0.14, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Coordinate labels
+      ctx.fillStyle = '#5a3a10';
+      ctx.font = `${Math.max(10, CELL * 0.38)}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i < boardSize; i++) {
+        const col = columnToLetter(i);
+        const row = boardSize - i;
+        ctx.fillText(col, MARGIN + i * CELL, MARGIN * 0.5);
+        ctx.fillText(col, MARGIN + i * CELL, CANVAS_SIZE - MARGIN * 0.5);
+        ctx.fillText(row, MARGIN * 0.5, MARGIN + i * CELL);
+        ctx.fillText(row, CANVAS_SIZE - MARGIN * 0.5, MARGIN + i * CELL);
+      }
+
+      // Ko point indicator
+      if (koPoint) {
+        const [kr, kc] = koPoint;
+        ctx.strokeStyle = 'rgba(255, 80, 80, 0.7)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(
+          MARGIN + kc * CELL - CELL * 0.35,
+          MARGIN + kr * CELL - CELL * 0.35,
+          CELL * 0.7, CELL * 0.7
+        );
+      }
+
+      // Stones
+      const r = CELL * 0.46;
+      for (let row = 0; row < boardSize; row++) {
+        for (let col = 0; col < boardSize; col++) {
+          const stone = board[row][col];
+          if (stone === EMPTY) continue;
+          const x = MARGIN + col * CELL;
+          const y = MARGIN + row * CELL;
+
+          // Shadow
+          ctx.beginPath();
+          ctx.arc(x + 1.5, y + 2, r, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(0,0,0,0.35)';
+          ctx.fill();
+
+          // Stone body
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, Math.PI * 2);
+          if (stone === BLACK) {
+            const g = ctx.createRadialGradient(x - r*0.3, y - r*0.3, r*0.05, x, y, r);
+            g.addColorStop(0, '#666');
+            g.addColorStop(0.4, '#222');
+            g.addColorStop(1, '#000');
+            ctx.fillStyle = g;
+          } else {
+            const g = ctx.createRadialGradient(x - r*0.3, y - r*0.3, r*0.05, x, y, r);
+            g.addColorStop(0, '#ffffff');
+            g.addColorStop(0.5, '#e8e8e8');
+            g.addColorStop(1, '#b0b0b0');
+            ctx.fillStyle = g;
+          }
+          ctx.fill();
+
+          // Highlight
+          ctx.beginPath();
+          ctx.arc(x - r*0.25, y - r*0.28, r * 0.25, 0, Math.PI * 2);
+          ctx.fillStyle = stone === BLACK
+            ? 'rgba(255,255,255,0.12)'
+            : 'rgba(255,255,255,0.65)';
+          ctx.fill();
+        }
+      }
+    }
+
+    // ─── Mouse / Touch Input ──────────────────────────────────────────────────
+    function canvasToGrid(px, py) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const cx = (px - rect.left) * scaleX;
+      const cy = (py - rect.top) * scaleY;
+      const c = Math.round((cx - MARGIN) / CELL);
+      const r = Math.round((cy - MARGIN) / CELL);
+      return [r, c];
+    }
+
+    canvas.addEventListener('click', e => {
+      const [r, c] = canvasToGrid(e.clientX, e.clientY);
+      placeStone(r, c);
+    });
+
+    canvas.addEventListener('touchend', e => {
+      e.preventDefault();
+      const touch = e.changedTouches[0];
+      const [r, c] = canvasToGrid(touch.clientX, touch.clientY);
+      placeStone(r, c);
+    }, { passive: false });
+
+    // Hover preview
+    let hoverR = -1, hoverC = -1;
+    canvas.addEventListener('mousemove', e => {
+      const [r, c] = canvasToGrid(e.clientX, e.clientY);
+      if (r !== hoverR || c !== hoverC) {
+        hoverR = r; hoverC = c;
+        drawBoardWithHover();
+      }
+    });
+    canvas.addEventListener('mouseleave', () => {
+      hoverR = -1; hoverC = -1;
+      drawBoard();
+    });
+
+    function drawBoardWithHover() {
+      drawBoard();
+      if (!gameOver && inBounds(hoverR, hoverC) && board[hoverR][hoverC] === EMPTY) {
+        const x = MARGIN + hoverC * CELL;
+        const y = MARGIN + hoverR * CELL;
+        const r = CELL * 0.46;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = currentPlayer === BLACK
+          ? 'rgba(0,0,0,0.4)'
+          : 'rgba(255,255,255,0.4)';
+        ctx.fill();
+      }
+    }
+
+    // ─── Button Handlers ──────────────────────────────────────────────────────
+    document.getElementById('btn-pass').addEventListener('click', pass);
+    document.getElementById('btn-resign').addEventListener('click', resign);
+    document.getElementById('btn-new-game').addEventListener('click', startNewGame);
+    document.getElementById('btn-modal-new').addEventListener('click', () => {
+      document.getElementById('result-modal').classList.remove('show');
+      startNewGame();
+    });
+
+    document.querySelectorAll('.size-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        boardSize = parseInt(btn.dataset.size);
+        startNewGame();
+      });
+    });
+
+    function startNewGame() {
+      calcLayout();
+      initBoard();
+      document.getElementById('game-log').innerHTML = '';
+      logMessage(`Ván mới bắt đầu! Bàn ${boardSize}×${boardSize}`);
+      updateUI();
+      drawBoard();
+    }
+
+    // ─── Init ─────────────────────────────────────────────────────────────────
+    startNewGame();
+
+    // Redraw on resize
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        calcLayout();
+        drawBoard();
+      }, 100);
+    });
+  </script>
+</body>
+</html>
